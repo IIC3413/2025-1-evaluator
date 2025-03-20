@@ -1,0 +1,6 @@
+tests/*
+results/*
+submissions/*
+!rests/.keep
+!results/.keep
+!submissions/.keep

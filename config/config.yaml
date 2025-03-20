@@ -1,0 +1,4 @@
+output_name: "report.csv"
+submission: "test"
+test: "test"
+verification_code: "super_secret_code"
