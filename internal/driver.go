@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"encoding/csv"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -51,6 +52,7 @@ func evalSubmission(s string, ctx ExecContext) (r Results, err error) {
 		}
 	}()
 
+	r.id = extlessBase(s)
 	if err = unzipSubmission(s); err != nil {
 		return Results{}, err
 	}
@@ -58,14 +60,21 @@ func evalSubmission(s string, ctx ExecContext) (r Results, err error) {
 		return Results{}, err
 	}
 	if err = compileTests(); err != nil {
-		return Results{}, err
+		// A compilation error means no points can be awarded.
+		log.Printf(
+			"Failed compilation for submission %s: %s",
+			r.id,
+			err.Error(),
+		)
+		return Results{
+			id:  r.id,
+			pts: make([]int, len(ctx.Tests)),
+		}, nil
 	}
 
-	r, err = runTests(ctx.Tests, ctx.VerCode)
-	if err != nil {
+	if err = runTests(&r, ctx.Tests, ctx.VerCode); err != nil {
 		return Results{}, err
 	}
-	r.id = extlessBase(s)
 	return r, removeSubmission()
 }
 
@@ -148,7 +157,7 @@ func compileTests() (err error) {
 	return nil
 }
 
-func runTests(tests []string, vc string) (r Results, err error) {
+func runTests(r *Results, tests []string, vc string) (err error) {
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("failed to run tests: %w", err)
@@ -164,15 +173,21 @@ func runTests(tests []string, vc string) (r Results, err error) {
 		//nolint:govet // no problem shadowing err here.
 		result, err := runCommand(cmd)
 		if err != nil {
-			return Results{}, err
+			log.Printf(
+				"Failed to run test %d for submission %s: %s",
+				i,
+				r.id,
+				err.Error(),
+			)
+			continue // An error here means no points for this test.
 		}
 		rp, err := parseResult(result, vc)
 		if err != nil {
-			return Results{}, err
+			return err
 		}
 		r.pts[i] = rp
 	}
-	return r, nil
+	return nil
 }
 
 func parseResult(result string, vc string) (int, error) {
