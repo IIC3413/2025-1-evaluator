@@ -20,6 +20,8 @@ type Results struct {
 }
 
 func Run(ctx ExecContext) (err error) {
+	// We run the tests before creating the output file so no submission can
+	// search for it and make changes.
 	rs := make([]Results, len(ctx.Submissions))
 	for i, s := range ctx.Submissions {
 		if rs[i], err = evalSubmission(s, ctx); err != nil {
@@ -27,7 +29,8 @@ func Run(ctx ExecContext) (err error) {
 		}
 	}
 
-	f, err := os.Create(filepath.Join(ioDir, resultBaseDir, ctx.OutputName))
+	out := filepath.Join(ioDir, resultBaseDir, ctx.OutputName) + ".csv"
+	f, err := os.Create(out)
 	if err != nil {
 		return err
 	}

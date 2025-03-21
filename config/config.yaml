@@ -1,4 +1,4 @@
-output_name: "report.csv"
-submission: "test"
-test: "test"
-verification_code: "super_secret_code"
+output_name: "super_secret_code_1"
+submission: "l1"
+test: "l1"
+verification_code: "super_secret_code_2"
