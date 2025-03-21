@@ -1,6 +1,6 @@
-tests/*
-results/*
-submissions/*
-!rests/.keep
-!results/.keep
-!submissions/.keep
+io/tests/*
+io/results/*
+io/submissions/*
+!io/rests/.keep
+!io/results/.keep
+!io/submissions/.keep
