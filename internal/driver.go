@@ -13,6 +13,11 @@ import (
 
 const dirPermission = 0777 //nolint:gofumpt // it formatted is though.
 
+type Results struct {
+	id  string
+	pts []int
+}
+
 func Run(ctx ExecContext) (err error) {
 	rs := make([]Results, len(ctx.Submissions))
 	for i, s := range ctx.Submissions {
@@ -30,8 +35,8 @@ func Run(ctx ExecContext) (err error) {
 	w := csv.NewWriter(f)
 	defer w.Flush()
 
-	for i, r := range rs {
-		if err = writeResult(w, ctx.Submissions[i], r); err != nil {
+	for _, r := range rs {
+		if err = writeResult(w, r); err != nil {
 			return err
 		}
 	}
@@ -60,6 +65,7 @@ func evalSubmission(s string, ctx ExecContext) (r Results, err error) {
 	if err != nil {
 		return Results{}, err
 	}
+	r.id = extlessBase(s)
 	return r, removeSubmission()
 }
 
@@ -142,11 +148,6 @@ func compileTests() (err error) {
 	return nil
 }
 
-type Results struct {
-	pts      []int
-	totalPts int
-}
-
 func runTests(tests []string, vc string) (r Results, err error) {
 	defer func() {
 		if err != nil {
@@ -165,47 +166,36 @@ func runTests(tests []string, vc string) (r Results, err error) {
 		if err != nil {
 			return Results{}, err
 		}
-		rp, rt, err := parseResult(result, vc)
+		rp, err := parseResult(result, vc)
 		if err != nil {
 			return Results{}, err
 		}
 		r.pts[i] = rp
-		r.totalPts += rt
 	}
 	return r, nil
 }
 
-func parseResult(result string, vc string) (int, int, error) {
+func parseResult(result string, vc string) (int, error) {
 	if !strings.HasPrefix(result, vc) {
-		return 0, 0, fmt.Errorf("invalid result: %s", result)
+		return 0, fmt.Errorf("invalid result: %s", result)
 	}
 
-	infoS := strings.Replace(result, vc, "", 1)
-	infoS = strings.ReplaceAll(infoS, " ", "")
-	infoS = strings.ReplaceAll(infoS, "\n", "")
+	info := strings.Replace(result, vc, "", 1)
+	info = strings.ReplaceAll(info, " ", "")
+	info = strings.ReplaceAll(info, "\n", "")
 
-	info := strings.Split(infoS, "/")
-	if len(info) != 2 {
-		return 0, 0, fmt.Errorf("invalid result: %s", result)
-	}
-
-	pts, err := strconv.Atoi(info[0])
+	pts, err := strconv.Atoi(info)
 	if err != nil {
-		return 0, 0, fmt.Errorf("invalid result: %w", err)
-	}
-	ofpts, err := strconv.Atoi(info[1])
-	if err != nil {
-		return 0, 0, fmt.Errorf("invalid result: %w", err)
+		return 0, fmt.Errorf("invalid result: %w", err)
 	}
 
-	return pts, ofpts, nil
+	return pts, nil
 }
 
-func writeResult(w *csv.Writer, s string, r Results) error {
-	line := make([]string, len(r.pts)+3)
-	line[0] = extlessBase(s)
-	line[len(line)-2] = strconv.Itoa(sum(r.pts))
-	line[len(line)-1] = strconv.Itoa(r.totalPts)
+func writeResult(w *csv.Writer, r Results) error {
+	line := make([]string, len(r.pts)+2)
+	line[0] = r.id
+	line[len(line)-1] = strconv.Itoa(sum(r.pts))
 	for i, p := range r.pts {
 		line[i+1] = strconv.Itoa(p)
 	}

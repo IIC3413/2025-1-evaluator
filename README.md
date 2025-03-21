@@ -21,7 +21,7 @@ byte string encoded in base 32 should do the job.
 
 Tests should be written such that their output are of the form:
 ```
-{verification_code} {points_obtained}/{total_points}
+{verification_code} {points_obtained}
 ```
 which means that a verification code must be chosen in advance.
 
