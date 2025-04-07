@@ -8,8 +8,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
-	"strings"
 )
 
 const dirPermission = 0777 //nolint:gofumpt // it formatted is though.
@@ -75,7 +75,7 @@ func evalSubmission(s string, ctx ExecContext) (r Results, err error) {
 		}, nil
 	}
 
-	if err = runTests(&r, ctx.Tests, ctx.VerCode); err != nil {
+	if err = runTests(&r, ctx.Tests, ctx.VerOutputRGX); err != nil {
 		return Results{}, err
 	}
 	return r, removeSubmission()
@@ -160,7 +160,7 @@ func compileTests() (err error) {
 	return nil
 }
 
-func runTests(r *Results, tests []string, vc string) (err error) {
+func runTests(r *Results, tests []string, vor *regexp.Regexp) (err error) {
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("failed to run tests: %w", err)
@@ -184,7 +184,7 @@ func runTests(r *Results, tests []string, vc string) (err error) {
 			)
 			continue // An error here means no points for this test.
 		}
-		rp, err := parseResult(result, vc)
+		rp, err := parseResult(result, vor)
 		if err != nil {
 			return err
 		}
@@ -193,20 +193,17 @@ func runTests(r *Results, tests []string, vc string) (err error) {
 	return nil
 }
 
-func parseResult(result string, vc string) (int, error) {
-	if !strings.HasPrefix(result, vc) {
-		return 0, fmt.Errorf("invalid result: %s", result)
+func parseResult(result string, vor *regexp.Regexp) (int, error) {
+	matches := vor.FindStringSubmatch(result)
+	// No expresion match means an error on our end.
+	// Idea: maybe submission could disable stdout?
+	if len(matches) != 2 {
+		return 0, fmt.Errorf("result is missing test output: %s", result)
 	}
-
-	info := strings.Replace(result, vc, "", 1)
-	info = strings.ReplaceAll(info, " ", "")
-	info = strings.ReplaceAll(info, "\n", "")
-
-	pts, err := strconv.Atoi(info)
+	pts, err := strconv.Atoi(matches[1])
 	if err != nil {
 		return 0, fmt.Errorf("invalid result: %w", err)
 	}
-
 	return pts, nil
 }
 

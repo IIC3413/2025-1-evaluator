@@ -52,6 +52,7 @@ type ExecContext struct {
 	Submissions   []string
 	Tests         []string
 	TestTargetDir string
+	VerOutputRGX  *regexp.Regexp
 }
 
 func SetUpContext(conf Config) (ExecContext, error) {
@@ -73,7 +74,12 @@ func SetUpContext(conf Config) (ExecContext, error) {
 		return ExecContext{}, err
 	}
 
-	return ExecContext{conf, subs, tests, ttd}, nil
+	vcr, err := regexp.Compile(regexp.QuoteMeta(conf.VerCode) + `(\d+)\n`)
+	if err != nil {
+		return ExecContext{}, err
+	}
+
+	return ExecContext{conf, subs, tests, ttd, vcr}, nil
 }
 
 func getDirFiles(path string) ([]string, error) {
