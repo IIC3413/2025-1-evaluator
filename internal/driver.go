@@ -74,6 +74,9 @@ func evalSubmission(s string, ctx ExecContext) (r Results, err error) {
 			pts: make([]int, len(ctx.Tests)),
 		}, nil
 	}
+	if err = copyDBs(ctx.DBs); err != nil {
+		return Results{}, err
+	}
 
 	if err = runTests(&r, ctx.Tests, ctx.VerOutputRGX); err != nil {
 		return Results{}, err
@@ -122,6 +125,27 @@ func copyTests(tt string, tests []string) (err error) {
 
 	for _, t := range tests {
 		err = copyFile(t, filepath.Join(target, filepath.Base(t)))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func copyDBs(dbs []string) (err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("failed to copy databases: %w", err)
+		}
+	}()
+
+	target := filepath.Join(workingDir, dataDir, dbDir)
+	if err = os.Mkdir(target, dirPermission); err != nil {
+		return err
+	}
+
+	for _, db := range dbs {
+		err = copyFile(db, filepath.Join(target, filepath.Base(db)))
 		if err != nil {
 			return err
 		}

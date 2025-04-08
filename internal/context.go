@@ -23,6 +23,7 @@ const (
 	releaseDir         = "Release"
 	binDir             = "bin"
 	dataDir            = "data"
+	dbDir              = "dbs"
 )
 
 //go:embed data/CMakeLists.txt
@@ -49,6 +50,7 @@ func OpenConfig(path string) (Config, error) {
 
 type ExecContext struct {
 	Config
+	DBs           []string
 	Submissions   []string
 	Tests         []string
 	TestTargetDir string
@@ -63,26 +65,36 @@ func SetUpContext(conf Config) (ExecContext, error) {
 		return ExecContext{}, err
 	}
 
-	tests, err := getDirFiles(filepath.Join(ioDir, testsBaseDir, conf.TestDir))
+	testsPath := filepath.Join(ioDir, testsBaseDir, conf.TestDir)
+	tests, err := getDirFiles(testsPath, suffixFilter(".cc"))
+	if err != nil {
+		return ExecContext{}, err
+	}
+	dbs, err := getDirFiles(testsPath, suffixFilter(".db"))
 	if err != nil {
 		return ExecContext{}, err
 	}
 
 	ttd := rand.Text()
-
 	if err = writeCMakeTargets(tests, ttd); err != nil {
 		return ExecContext{}, err
 	}
 
-	vcr, err := regexp.Compile(regexp.QuoteMeta(conf.VerCode) + `(\d+)\n`)
+	vor, err := regexp.Compile(regexp.QuoteMeta(conf.VerCode) + `(\d+)\n`)
 	if err != nil {
 		return ExecContext{}, err
 	}
 
-	return ExecContext{conf, subs, tests, ttd, vcr}, nil
+	return ExecContext{conf, dbs, subs, tests, ttd, vor}, nil
 }
 
-func getDirFiles(path string) ([]string, error) {
+func suffixFilter(sfx string) func(s string) bool {
+	return func(s string) bool {
+		return strings.HasSuffix(s, sfx)
+	}
+}
+
+func getDirFiles(path string, filters ...func(string) bool) ([]string, error) {
 	ents, err := os.ReadDir(path)
 	if err != nil {
 		return nil, err
@@ -92,6 +104,11 @@ func getDirFiles(path string) ([]string, error) {
 	for _, e := range ents {
 		if e.IsDir() {
 			continue
+		}
+		for _, fl := range filters {
+			if !fl(e.Name()) {
+				continue
+			}
 		}
 		fents = append(fents, filepath.Join(path, e.Name()))
 	}
