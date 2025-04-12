@@ -10,4 +10,7 @@ COPY main.go ./
 RUN go build -o main .
 # Copy IO
 COPY wkdir/ wkdir/
-ENTRYPOINT ["./main", "-c=config/config.yaml"]
+# Create submissions user and group.
+RUN groupadd --gid 1001 subgroup
+RUN useradd subuser --uid 1001 --gid 1001 --shell /bin/bash
+ENTRYPOINT ["./main"]

@@ -7,26 +7,26 @@ import (
 	"os"
 )
 
-func exitWithErr(err error) {
-	log.Printf("Error: %s\n", err.Error())
-	os.Exit(1)
-}
+const errPrefix = "Error: %s"
 
 func main() {
-	confPath := flag.String("c", "config.yaml", "configuration file path")
+	labName := flag.String("n", "", "laboratory name")
 	flag.Parse()
 
-	conf, err := internal.OpenConfig(*confPath)
+	ctx, err := internal.SetUpContext(*labName)
 	if err != nil {
-		exitWithErr(err)
+		log.Printf(errPrefix, err)
+		os.Exit(1)
 	}
 
-	ctx, err := internal.SetUpContext(conf)
+	e, err := internal.NewEvaluator(ctx)
 	if err != nil {
-		exitWithErr(err)
+		log.Printf(errPrefix, err)
+		os.Exit(1)
 	}
 
-	if err = internal.Run(ctx); err != nil {
-		exitWithErr(err)
+	if err = e.Eval(); err != nil {
+		log.Printf(errPrefix, err)
+		os.Exit(1)
 	}
 }

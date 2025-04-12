@@ -56,7 +56,7 @@ TEST_REPLACE
 
 # Build targets
 foreach(target ${BUILD_TARGETS})
-	add_executable(${target} ${CMAKE_SOURCE_DIR}/src/TARGET_REPLACE/${target}.cc)
+	add_executable(${target} ${CMAKE_SOURCE_DIR}/src/tests/${target}.cc)
     target_link_libraries(${target}
         iic3413db
         antlr4_cpp_runtime

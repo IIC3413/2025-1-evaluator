@@ -2,6 +2,7 @@ package internal
 
 import (
 	"archive/zip"
+	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 )
 
 const copyLimit = 2 << 24
@@ -32,7 +34,7 @@ func copyZipFile(fd *zip.File, target string) (err error) {
 	}
 
 	if fd.Mode().IsDir() {
-		if err = os.MkdirAll(name, dirPermission); err != nil {
+		if err = os.MkdirAll(name, 0o777); err != nil {
 			return err
 		}
 		return nil
@@ -54,31 +56,7 @@ func copyZipFile(fd *zip.File, target string) (err error) {
 			return err
 		}
 	}
-
 	return nil
-}
-
-func copyFile(src, target string) (err error) {
-	defer func() {
-		if err != nil {
-			err = fmt.Errorf("failed to copy file: %w", err)
-		}
-	}()
-
-	f, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	nf, err := os.Create(target)
-	if err != nil {
-		return err
-	}
-	defer nf.Close()
-
-	_, err = io.Copy(nf, f)
-	return err
 }
 
 func runCommand(cmd *exec.Cmd) (string, error) {
@@ -96,10 +74,70 @@ func runCommand(cmd *exec.Cmd) (string, error) {
 	return stdout.String(), nil
 }
 
+func runCommandAsSubmission(cmd *exec.Cmd) (string, error) {
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Credential: &syscall.Credential{Uid: suid, Gid: sgid},
+	}
+	cmd.Dir = workingDir
+	return runCommand(cmd)
+}
+
 func sum(vs []int) int {
 	sum := 0
 	for _, v := range vs {
 		sum += v
 	}
 	return sum
+}
+
+type DirEntry struct {
+	os.DirEntry
+	path string
+}
+
+func dirEntriesEq(d1, d2 DirEntry) (bool, error) {
+	if d1.IsDir() != d2.IsDir() {
+		return false, fmt.Errorf(
+			"unable to compare two directories (%s, %s)",
+			d1.Name(),
+			d2.Name(),
+		)
+	}
+
+	f1, err := os.Open(d1.path)
+	if err != nil {
+		return false, err
+	}
+	defer f1.Close()
+	f2, err := os.Open(d2.path)
+	if err != nil {
+		return false, err
+	}
+	defer f2.Close()
+	return compReaders(bufio.NewReader(f1), bufio.NewReader(f2))
+}
+
+func compReaders(r1, r2 io.Reader) (bool, error) {
+	var (
+		err1, err2 error
+		rb1, rb2   int
+		buf1, buf2 = make([]byte, 1024), make([]byte, 1024)
+	)
+	for {
+		rb1, err1 = r1.Read(buf1)
+		rb2, err2 = r2.Read(buf2)
+		if err1 != nil || err2 != nil {
+			if errors.Is(err1, io.EOF) && errors.Is(err2, io.EOF) {
+				break
+			}
+			return false, errors.Join(err1, err2)
+		}
+		if rb1 != rb2 {
+			return false, nil
+		}
+		if !bytes.Equal(buf1[:rb1], buf2[:rb2]) {
+			return false, nil
+		}
+	}
+	return true, nil
 }
