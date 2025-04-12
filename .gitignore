@@ -1,8 +1,10 @@
-# Do not upload tests, results or submissions.
+# Do not upload tests, results, submissions or data.
 io/tests/*
 io/results/*
 io/submissions/*
+io/data/*
 # Do keep the folders.
 !io/rests/.keep
 !io/results/.keep
 !io/submissions/.keep
+!io/data/.keep
