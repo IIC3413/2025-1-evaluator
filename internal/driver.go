@@ -218,6 +218,9 @@ func (e *Evaluator) runTests(idx int) (err error) {
 				filepath.Base(e.ctx.Submissions[idx]),
 				err.Error(),
 			)
+			if err = writeErrorOutput(t); err != nil {
+				return err
+			}
 			continue // An error here means no points for this test.
 		}
 	}
@@ -304,6 +307,23 @@ func (e *Evaluator) writeResult(w *csv.Writer, idx int) (err error) {
 		line[i+1] = strconv.Itoa(p)
 	}
 	return w.Write(line)
+}
+
+func writeErrorOutput(t string) (err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("failed to write error output: %w", err)
+		}
+	}()
+
+	f, err := os.Create(filepath.Join(workingDir, outputsDir, t+"_output"))
+	if err != nil {
+		return err
+	}
+	if _, err = f.WriteString("ERROR"); err != nil {
+		return err
+	}
+	return f.Close()
 }
 
 func removeSubmission() error {

@@ -45,10 +45,12 @@ io
                     test_2_output
 ```
 
-Tests should be written such that they always write and output file to an
-`outputs` directory inside the path where the executable is called, even if the
-submission in which they are ran crashes. A try/catch pattern should do the
-trick.
+A successful test, should write its output to an `outputs` directory inside the
+path where it's executable is called following the naming scheem of the files
+in `io/data/{lab_n}/outputs`. If a test encounters an error it may not write an
+output only if it exists with a none 0 code. In this case the evaluation
+program will write a predetermined output ensuring that this will be evaluated
+as wrong.
 
 To run the tests use the following command:
 
@@ -56,7 +58,7 @@ To run the tests use the following command:
 make LAB_NAME={lab_n} run
 ```
 
-where `{lab_n}` corresponds to the name of the lab used when creating the
+Where `{lab_n}` corresponds to the name of the lab used when creating the
 aforementioned directories. The output will be written as a csv file in the
 `io/results` directory.
 
