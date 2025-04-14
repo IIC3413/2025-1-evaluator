@@ -127,6 +127,10 @@ func compReaders(r1, r2 io.Reader) (bool, error) {
 		rb1, err1 = r1.Read(buf1)
 		rb2, err2 = r2.Read(buf2)
 		if err1 != nil || err2 != nil {
+			if (rb1 != 0 && errors.Is(err2, io.EOF)) ||
+				(rb2 != 0 && errors.Is(err1, io.EOF)) {
+				return false, nil
+			}
 			if errors.Is(err1, io.EOF) && errors.Is(err2, io.EOF) {
 				break
 			}
@@ -139,5 +143,5 @@ func compReaders(r1, r2 io.Reader) (bool, error) {
 			return false, nil
 		}
 	}
-	return true, nil
+	return rb1 == rb2 && bytes.Equal(buf1[:rb1], buf2[:rb2]), nil
 }
