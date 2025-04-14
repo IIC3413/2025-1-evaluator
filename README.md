@@ -32,7 +32,7 @@ io
       |
       + --- lab_n
             |
-            + --- inputs
+            + --- eval_dbs
             |     |
             |     + --- test_1_db
             |     |       catalog.dat
