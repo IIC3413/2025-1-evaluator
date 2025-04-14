@@ -1,110 +1,117 @@
 package internal
 
 import (
-	"crypto/rand"
 	_ "embed"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
-
-	"github.com/goccy/go-yaml"
 )
 
 const (
-	ioDir              = "io"
-	testsBaseDir       = "tests"
-	submissionsBaseDir = "submissions"
-	resultBaseDir      = "results"
-	workingDir         = "wkdir"
-	srcDir             = "src"
-	cMakeFile          = "CMakeLists.txt"
-	buildDir           = "build"
-	releaseDir         = "Release"
-	binDir             = "bin"
-	dataDir            = "data"
+	// Directories.
+	ioDir          = "io-cpy"
+	testsDir       = "tests"
+	submissionsDir = "submissions"
+	resultDir      = "results"
+	workingDir     = "wkdir"
+	srcDir         = "src"
+	cMakeFile      = "CMakeLists.txt"
+	buildDir       = "build"
+	releaseDir     = "Release"
+	binDir         = "bin"
+	dataDir        = "data"
+	dbDir          = "eval_dbs"
+	outputsDir     = "outputs"
+	// User and group for running tests on submissions.
+	suid uint32 = 1001
+	sgid uint32 = 1001
 )
 
 //go:embed data/CMakeLists.txt
 var cmake []byte
 
-type Config struct {
-	OutputName    string `yaml:"output_name"`
-	SumbissionDir string `yaml:"submission"`
-	TestDir       string `yaml:"test"`
-	VerCode       string `yaml:"verification_code"`
-}
-
-func OpenConfig(path string) (Config, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return Config{}, err
-	}
-	defer f.Close()
-
-	var config Config
-	err = yaml.NewDecoder(f).Decode(&config)
-	return config, err
-}
-
 type ExecContext struct {
-	Config
-	Submissions   []string
-	Tests         []string
-	TestTargetDir string
-	VerOutputRGX  *regexp.Regexp
+	Submissions []string
+	Tests       []string
+	TestsPath   string
+	InputsPath  string
+	OutputsPath string
 }
 
-func SetUpContext(conf Config) (ExecContext, error) {
+func SetUpContext(lab string) (*ExecContext, error) {
 	subs, err := getDirFiles(
-		filepath.Join(ioDir, submissionsBaseDir, conf.SumbissionDir),
+		filepath.Join(ioDir, submissionsDir, lab),
 	)
 	if err != nil {
-		return ExecContext{}, err
+		return nil, err
 	}
-
-	tests, err := getDirFiles(filepath.Join(ioDir, testsBaseDir, conf.TestDir))
+	tests, testsPath, err := getTests(lab)
 	if err != nil {
-		return ExecContext{}, err
+		return nil, err
+	}
+	inputsPath := filepath.Join(ioDir, dataDir, lab, dbDir)
+	outputsPath := filepath.Join(ioDir, dataDir, lab, outputsDir)
+	if err = writeCMakeTargets(tests); err != nil {
+		return nil, err
 	}
 
-	ttd := rand.Text()
-
-	if err = writeCMakeTargets(tests, ttd); err != nil {
-		return ExecContext{}, err
-	}
-
-	vcr, err := regexp.Compile(regexp.QuoteMeta(conf.VerCode) + `(\d+)\n`)
-	if err != nil {
-		return ExecContext{}, err
-	}
-
-	return ExecContext{conf, subs, tests, ttd, vcr}, nil
+	return &ExecContext{subs, tests, testsPath, inputsPath, outputsPath}, nil
 }
 
-func getDirFiles(path string) ([]string, error) {
+func getTests(lab string) ([]string, string, error) {
+	testsDirPath := filepath.Join(ioDir, testsDir, lab)
+	testCompTargets, err := getDirFiles(
+		testsDirPath,
+		func(s string) bool { return !strings.HasSuffix(s, ".h") },
+	)
+	if err != nil {
+		return nil, "", err
+	}
+	for i := range testCompTargets {
+		testCompTargets[i] = extlessBase(testCompTargets[i])
+	}
+	return testCompTargets, testsDirPath, nil
+}
+
+func getDirFiles(path string, filters ...func(string) bool) ([]string, error) {
 	ents, err := os.ReadDir(path)
 	if err != nil {
 		return nil, err
 	}
 
 	fents := []string{}
+ENTS_LOOP:
 	for _, e := range ents {
 		if e.IsDir() {
 			continue
+		}
+		for _, fl := range filters {
+			if !fl(e.Name()) {
+				continue ENTS_LOOP
+			}
 		}
 		fents = append(fents, filepath.Join(path, e.Name()))
 	}
 	return fents, nil
 }
 
-func writeCMakeTargets(tests []string, testsTarget string) error {
-	testNames, err := buildTestNames(tests)
+func writeCMakeTargets(targets []string) (err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("failed to write cmake file: %w", err)
+		}
+	}()
+
+	targetNames, err := buildTargetNames(targets)
 	if err != nil {
 		return err
 	}
-	o := regexp.MustCompile(`TEST_REPLACE`).ReplaceAll(cmake, []byte(testNames))
-	o = regexp.MustCompile(`TARGET_REPLACE`).ReplaceAll(o, []byte(testsTarget))
+	o := regexp.MustCompile(`TEST_REPLACE`).ReplaceAll(
+		cmake,
+		[]byte(targetNames),
+	)
 	f, err := os.Create(filepath.Join(workingDir, cMakeFile))
 	if err != nil {
 		return err
@@ -115,16 +122,16 @@ func writeCMakeTargets(tests []string, testsTarget string) error {
 	return f.Close()
 }
 
-func buildTestNames(tests []string) (string, error) {
+func buildTargetNames(targets []string) (string, error) {
 	var (
 		err error
 		b   strings.Builder
 	)
-	for _, t := range tests {
+	for _, t := range targets {
 		if err = b.WriteByte('\t'); err != nil {
 			return "", err
 		}
-		if _, err = b.WriteString(extlessBase(t)); err != nil {
+		if _, err = b.WriteString(t); err != nil {
 			return "", err
 		}
 		if err = b.WriteByte('\n'); err != nil {
