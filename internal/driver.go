@@ -141,6 +141,9 @@ func (e *Evaluator) copyTests() (err error) {
 	}()
 
 	target := filepath.Join(workingDir, srcDir, testsDir)
+	if err = os.RemoveAll(target); err != nil {
+		return err
+	}
 	// Submissions should not be able to read the test directory.
 	if err = os.Mkdir(target, 0o700); err != nil {
 		return err
@@ -290,6 +293,9 @@ func (e *Evaluator) writeResults() (err error) {
 	w := csv.NewWriter(f)
 	defer w.Flush()
 
+	if err = e.writeHeader(w); err != nil {
+		return err
+	}
 	for i := range len(e.results) {
 		if err = e.writeResult(w, i); err != nil {
 			return err
@@ -298,8 +304,34 @@ func (e *Evaluator) writeResults() (err error) {
 	return nil
 }
 
+func (e *Evaluator) writeHeader(w *csv.Writer) (err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("failed to write results' header: %w", err)
+		}
+	}()
+	header := make([]string, len(e.ctx.Tests)+2)
+	header[0] = "submission"
+	header[len(header)-1] = "total"
+	for i, t := range e.ctx.Tests {
+		header[i+1] = t
+	}
+	return w.Write(header)
+}
+
 func (e *Evaluator) writeResult(w *csv.Writer, idx int) (err error) {
 	r := e.results[idx]
+
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf(
+				"failed to write %s results: %w",
+				extlessBase(r.id),
+				err,
+			)
+		}
+	}()
+
 	line := make([]string, len(r.pts)+2)
 	line[0] = extlessBase(r.id)
 	line[len(line)-1] = strconv.Itoa(sum(r.pts))
