@@ -41,22 +41,37 @@ static HeapFile* get_or_create_table(std::string table_name, Schema& schema) {
   return table;
 }
 
-static HeapFile* clone_table(std::string test_name, std::string src_name, std::string target_name) {
-  Schema schema;
-  assert(catalog.get_table(src_name, &schema) != nullptr);
-  auto table = catalog.create_table(target_name, schema);
+static HeapFile*
+clone_table(std::string test_name, const Schema& schema, std::string src_name, std::string target_name) {
+  Schema src_schema;
+  assert(catalog.get_table(src_name, &src_schema) != nullptr);
   std::filesystem::copy_file(
       std::filesystem::path(get_db_name(test_name) + "/" + src_name),
       std::filesystem::path(get_db_name(test_name) + "/" + target_name),
       std::filesystem::copy_options::update_existing
   );
-  return table;
+  return catalog.create_table(target_name, schema);
 }
 
 static std::pair<std::string, std::string> test_table_names(std::string& test_name) {
   auto input_name = test_name + std::string("_input");
   auto output_name = test_name + std::string("_output");
   return std::pair(input_name, output_name);
+}
+
+[[maybe_unused]]
+static void zero_out_pages_free_space(std::string& table_name) {
+  Schema schema;
+  auto heap_file = catalog.get_table(table_name, &schema);
+  uint64_t total_pages = file_mgr.count_pages(heap_file->file_id);
+  char* zeros = new char[Page::SIZE]();
+  for (uint64_t i = 0; i < total_pages; i++) {
+    HeapFilePage page(heap_file->file_id, i);
+    auto entries = page.get_dir_count();
+    auto free_space = page.get_free_space();
+    page.page.write((2 + entries) * sizeof(int32_t), free_space, zeros);
+  }
+  delete []zeros;
 }
 
 [[maybe_unused]]
@@ -74,7 +89,7 @@ static void generate_test_tables(
   // Write to disk.
   buffer_mgr.flush();
   // Create the expected output table.
-  clone_table(test_name, input_table_name, output_table_name);
+  clone_table(test_name, schema, input_table_name, output_table_name);
   // Modify the expected output table to its desired state.
   output_setup(output_table_name);
 }
