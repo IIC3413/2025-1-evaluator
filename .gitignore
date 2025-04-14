@@ -1,4 +1,4 @@
-# Do not upload tests, results, submissions or data.
+# Do not upload tests, results, submissions or data by accident.
 io/tests/*
 io/results/*
 io/submissions/*
@@ -8,3 +8,6 @@ io/data/*
 !io/results/.keep
 !io/submissions/.keep
 !io/data/.keep
+# Add lab 1 baseline info.
+!io/tests/l1
+!io/data/l1
