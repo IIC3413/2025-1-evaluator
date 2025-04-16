@@ -4,10 +4,7 @@ import (
 	"evaluator/internal"
 	"flag"
 	"log"
-	"os"
 )
-
-const errPrefix = "Error: %s"
 
 func main() {
 	labName := flag.String("n", "", "laboratory name")
@@ -15,18 +12,19 @@ func main() {
 
 	ctx, err := internal.SetUpContext(*labName)
 	if err != nil {
-		log.Printf(errPrefix, err)
-		os.Exit(1)
+		log.Fatalf("Error: %s", err)
 	}
 
 	e, err := internal.NewEvaluator(ctx)
 	if err != nil {
-		log.Printf(errPrefix, err)
-		os.Exit(1)
+		log.Fatalf("Error: %s", err)
 	}
 
 	if err = e.Eval(); err != nil {
-		log.Printf(errPrefix, err)
-		os.Exit(1)
+		log.Fatalf("Error: %s", err)
+	}
+
+	if err = e.FreeLogs(); err != nil {
+		log.Fatalf("Error: %s", err)
 	}
 }

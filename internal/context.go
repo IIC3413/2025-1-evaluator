@@ -33,11 +33,9 @@ const (
 var cmake []byte
 
 type ExecContext struct {
+	Label       string
 	Submissions []string
 	Tests       []string
-	TestsPath   string
-	InputsPath  string
-	OutputsPath string
 }
 
 func SetUpContext(lab string) (*ExecContext, error) {
@@ -47,32 +45,36 @@ func SetUpContext(lab string) (*ExecContext, error) {
 	if err != nil {
 		return nil, err
 	}
-	tests, testsPath, err := getTests(lab)
+	tests, err := getTests(lab)
 	if err != nil {
 		return nil, err
 	}
-	inputsPath := filepath.Join(ioDir, dataDir, lab, dbDir)
-	outputsPath := filepath.Join(ioDir, dataDir, lab, outputsDir)
+	// inputsPath := filepath.Join(ioDir, dataDir, lab, dbDir)
+	// outputsPath := filepath.Join(ioDir, dataDir, lab, outputsDir)
 	if err = writeCMakeTargets(tests); err != nil {
 		return nil, err
 	}
 
-	return &ExecContext{subs, tests, testsPath, inputsPath, outputsPath}, nil
+	return &ExecContext{
+		lab,
+		subs,
+		tests,
+	}, nil
 }
 
-func getTests(lab string) ([]string, string, error) {
+func getTests(lab string) ([]string, error) {
 	testsDirPath := filepath.Join(ioDir, testsDir, lab)
 	testCompTargets, err := getDirFiles(
 		testsDirPath,
 		func(s string) bool { return !strings.HasSuffix(s, ".h") },
 	)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 	for i := range testCompTargets {
 		testCompTargets[i] = extlessBase(testCompTargets[i])
 	}
-	return testCompTargets, testsDirPath, nil
+	return testCompTargets, nil
 }
 
 func getDirFiles(path string, filters ...func(string) bool) ([]string, error) {

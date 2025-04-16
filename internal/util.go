@@ -23,11 +23,18 @@ func copyZipFile(fd *zip.File, target string) (err error) {
 		}
 	}()
 
-	fp := strings.Split(fd.Name, string(os.PathSeparator))
+	// Fuck. you. tim. cook.
+	if strings.Contains(fd.Name, ".DS_Store") ||
+		strings.Contains(fd.Name, "._") {
+		return nil
+	}
+
+	fp := strings.Split(sourcefy(fd.Name), string(os.PathSeparator))
 	// Early exit if source dir.
 	if len(fp) == 0 || len(fp) == 1 {
 		return nil
 	}
+
 	name := filepath.Join(target, filepath.Join(fp[1:]...))
 	if !strings.HasPrefix(name, filepath.Clean(target)) {
 		return fmt.Errorf("malicious path found: %s", fd.Name)
@@ -144,4 +151,19 @@ func compReaders(r1, r2 io.Reader) (bool, error) {
 		}
 	}
 	return rb1 == rb2 && bytes.Equal(buf1[:rb1], buf2[:rb2]), nil
+}
+
+func sourcefy(path string) string {
+	if !strings.Contains(path, "src") {
+		split := strings.SplitN(path, string(os.PathSeparator), 2)
+		if len(split) == 1 {
+			return filepath.Join("src", split[0])
+		}
+		return filepath.Join("src", split[1])
+	}
+	split := strings.SplitN(path, "src", 2)
+	if len(split) == 1 {
+		return "src" + split[0]
+	}
+	return "src" + split[1]
 }

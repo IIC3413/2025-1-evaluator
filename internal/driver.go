@@ -2,6 +2,7 @@ package internal
 
 import (
 	"archive/zip"
+	"context"
 	"encoding/csv"
 	"errors"
 	"fmt"
@@ -12,6 +13,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"time"
+
+	"github.com/schollz/progressbar/v3"
 )
 
 type Results struct {
@@ -22,12 +25,20 @@ type Results struct {
 type Evaluator struct {
 	ctx     *ExecContext
 	results []Results
+	logfile *os.File
+	logger  *log.Logger
 }
 
 func NewEvaluator(ctx *ExecContext) (*Evaluator, error) {
+	f, err := os.Create(filepath.Join(ioDir, resultDir, ctx.Label+".log"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to setup logs: %w", err)
+	}
 	e := Evaluator{
 		ctx:     ctx,
 		results: make([]Results, len(ctx.Submissions)),
+		logfile: f,
+		logger:  log.New(f, "", log.LstdFlags),
 	}
 	return &e, nil
 }
@@ -36,6 +47,7 @@ func (e *Evaluator) Eval() error {
 	var err error
 	// We run the tests before creating the output file so no submission can
 	// search for it and make changes.
+	prog := progressbar.Default(int64(len(e.ctx.Submissions)))
 	for i := range len(e.ctx.Submissions) {
 		if err = e.evalSubmission(i); err != nil {
 			return err
@@ -43,8 +55,15 @@ func (e *Evaluator) Eval() error {
 		if err = removeSubmission(); err != nil {
 			return err
 		}
+		if err = prog.Add(1); err != nil {
+			return err
+		}
 	}
 	return e.writeResults()
+}
+
+func (e *Evaluator) FreeLogs() error {
+	return e.logfile.Close()
 }
 
 func (e *Evaluator) evalSubmission(idx int) (err error) {
@@ -67,8 +86,8 @@ func (e *Evaluator) evalSubmission(idx int) (err error) {
 	}
 	if err = e.compileTests(); err != nil {
 		// A compilation error means no points can be awarded.
-		log.Printf(
-			"Failed to compile %s: %s",
+		e.logger.Printf(
+			"\nFailed to compile %s:\n%s====================================",
 			filepath.Base(e.ctx.Submissions[idx]),
 			err.Error(),
 		)
@@ -148,7 +167,10 @@ func (e *Evaluator) copyTests() (err error) {
 	if err = os.Mkdir(target, 0o700); err != nil {
 		return err
 	}
-	return os.CopyFS(target, os.DirFS(e.ctx.TestsPath))
+	return os.CopyFS(
+		target,
+		os.DirFS(filepath.Join(ioDir, testsDir, e.ctx.Label)),
+	)
 }
 
 func (e *Evaluator) copyData() (err error) {
@@ -163,7 +185,11 @@ func (e *Evaluator) copyData() (err error) {
 	if err = os.MkdirAll(target, 0o777); err != nil {
 		return err
 	}
-	if err = os.CopyFS(target, os.DirFS(e.ctx.InputsPath)); err != nil {
+	err = os.CopyFS(
+		target,
+		os.DirFS(filepath.Join(ioDir, dataDir, e.ctx.Label, dbDir)),
+	)
+	if err != nil {
 		return err
 	}
 	return filepath.WalkDir(
@@ -190,7 +216,7 @@ func (e *Evaluator) compileTests() (err error) {
 		"cmake",
 		"-B"+binPath,
 		"-S"+workingDir,
-		"-DCMAKE_BUILD_TYPE=Release",
+		"-DCMAKE_BUILD_TYPE="+releaseDir,
 	)
 	cmd2 := exec.Command("cmake", "--build", binPath, "-j", "8")
 	if _, err = runCommand(cmd1); err != nil {
@@ -211,12 +237,15 @@ func (e *Evaluator) runTests(idx int) (err error) {
 	}()
 
 	binPath := filepath.Join(buildDir, releaseDir, binDir)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 	for i, t := range e.ctx.Tests {
 		//nolint:gosec // no user input used here.
-		cmd := exec.Command(filepath.Join(binPath, extlessBase(t)))
+		cmd := exec.CommandContext(ctx, filepath.Join(binPath, extlessBase(t)))
 		if _, err = runCommandAsSubmission(cmd); err != nil {
-			log.Printf(
-				"Failed to run test %d for submission %s: %s",
+			e.logger.Printf(
+				"\nFailed to run test %d for submission %s:\n"+
+					"%s================================",
 				i,
 				filepath.Base(e.ctx.Submissions[idx]),
 				err.Error(),
@@ -237,7 +266,8 @@ func (e *Evaluator) computeScore(idx int) (err error) {
 		}
 	}()
 
-	expected, err := os.ReadDir(e.ctx.OutputsPath)
+	outputsPath := filepath.Join(ioDir, dataDir, e.ctx.Label, outputsDir)
+	expected, err := os.ReadDir(outputsPath)
 	if err != nil {
 		return err
 	}
@@ -254,7 +284,7 @@ func (e *Evaluator) computeScore(idx int) (err error) {
 		ok, err = dirEntriesEq(
 			DirEntry{
 				expected[i],
-				filepath.Join(e.ctx.OutputsPath, expected[i].Name()),
+				filepath.Join(outputsPath, expected[i].Name()),
 			},
 			DirEntry{
 				produced[i],
@@ -279,11 +309,7 @@ func (e *Evaluator) writeResults() (err error) {
 		}
 	}()
 
-	out := filepath.Join(
-		ioDir,
-		resultDir,
-		time.Now().Format(time.DateTime),
-	) + ".csv"
+	out := filepath.Join(ioDir, resultDir, e.ctx.Label) + ".csv"
 	f, err := os.Create(out)
 	if err != nil {
 		return err
@@ -360,10 +386,14 @@ func writeErrorOutput(t string) (err error) {
 
 func removeSubmission() error {
 	src := filepath.Join(workingDir, srcDir)
+	build := filepath.Join(workingDir, buildDir)
 	data := filepath.Join(workingDir, dataDir)
 	output := filepath.Join(workingDir, outputsDir)
 
 	if err := os.RemoveAll(src); err != nil {
+		return err
+	}
+	if err := os.RemoveAll(build); err != nil {
 		return err
 	}
 	if err := os.RemoveAll(data); err != nil {
