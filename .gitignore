@@ -1,3 +1,4 @@
+io-cpy
 # Do not upload tests, results, submissions or data by accident.
 io/tests/*
 io/results/*
