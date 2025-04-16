@@ -6,6 +6,7 @@
 
 void run(std::string table_name) {
   catalog.get_table_info(table_name).heap_file->vacuum();
+  Utils::zero_out_pages_free_space(table_name);
 }
 
 int main() {
