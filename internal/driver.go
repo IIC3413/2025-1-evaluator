@@ -210,13 +210,13 @@ func (e *Evaluator) compileTests() (err error) {
 		}
 	}()
 
-	binPath := filepath.Join(workingDir, buildDir, releaseDir)
+	binPath := filepath.Join(workingDir, buildDir, e.ctx.Build)
 	//nolint:gosec // no user provider paths.
 	cmd1 := exec.Command(
 		"cmake",
 		"-B"+binPath,
 		"-S"+workingDir,
-		"-DCMAKE_BUILD_TYPE="+releaseDir,
+		"-DCMAKE_BUILD_TYPE="+e.ctx.Build,
 	)
 	cmd2 := exec.Command("cmake", "--build", binPath, "-j", "8")
 	if _, err = runCommand(cmd1); err != nil {
@@ -236,7 +236,7 @@ func (e *Evaluator) runTests(idx int) (err error) {
 		}
 	}()
 
-	binPath := filepath.Join(buildDir, releaseDir, binDir)
+	binPath := filepath.Join(buildDir, e.ctx.Build, binDir)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	for i, t := range e.ctx.Tests {

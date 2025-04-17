@@ -19,7 +19,6 @@ const (
 	srcDir         = "src"
 	cMakeFile      = "CMakeLists.txt"
 	buildDir       = "build"
-	releaseDir     = "Release"
 	binDir         = "bin"
 	dataDir        = "data"
 	dbDir          = "eval_dbs"
@@ -34,11 +33,12 @@ var cmake []byte
 
 type ExecContext struct {
 	Label       string
+	Build       string
 	Submissions []string
 	Tests       []string
 }
 
-func SetUpContext(lab string) (*ExecContext, error) {
+func SetUpContext(lab, mode string) (*ExecContext, error) {
 	subs, err := getDirFiles(
 		filepath.Join(ioDir, submissionsDir, lab),
 	)
@@ -49,14 +49,13 @@ func SetUpContext(lab string) (*ExecContext, error) {
 	if err != nil {
 		return nil, err
 	}
-	// inputsPath := filepath.Join(ioDir, dataDir, lab, dbDir)
-	// outputsPath := filepath.Join(ioDir, dataDir, lab, outputsDir)
 	if err = writeCMakeTargets(tests); err != nil {
 		return nil, err
 	}
 
 	return &ExecContext{
 		lab,
+		mode,
 		subs,
 		tests,
 	}, nil

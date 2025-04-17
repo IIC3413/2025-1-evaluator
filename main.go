@@ -8,9 +8,14 @@ import (
 
 func main() {
 	labName := flag.String("n", "", "laboratory name")
+	mode := flag.String("m", "Release", "compilation mode")
 	flag.Parse()
 
-	ctx, err := internal.SetUpContext(*labName)
+	if labName == nil || *labName == "" {
+		log.Fatal("Missing lab name flag")
+	}
+
+	ctx, err := internal.SetUpContext(*labName, *mode)
 	if err != nil {
 		log.Fatalf("Error: %s", err)
 	}
