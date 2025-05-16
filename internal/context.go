@@ -23,6 +23,8 @@ const (
 	dataDir        = "data"
 	dbDir          = "eval_dbs"
 	outputsDir     = "outputs"
+	correctionsDir = "corrections"
+	correctionYaml = "corrections.yaml"
 	// User and group for running tests on submissions.
 	suid uint32 = 1001
 	sgid uint32 = 1001
@@ -36,6 +38,7 @@ type ExecContext struct {
 	Build       string
 	Submissions []string
 	Tests       []string
+	Corrections corrections
 }
 
 func SetUpContext(lab, mode string) (*ExecContext, error) {
@@ -52,13 +55,12 @@ func SetUpContext(lab, mode string) (*ExecContext, error) {
 	if err = writeCMakeTargets(tests); err != nil {
 		return nil, err
 	}
+	cors, err := loadCorrections(lab)
+	if err != nil {
+		return nil, err
+	}
 
-	return &ExecContext{
-		lab,
-		mode,
-		subs,
-		tests,
-	}, nil
+	return &ExecContext{lab, mode, subs, tests, cors}, nil
 }
 
 func getTests(lab string) ([]string, error) {

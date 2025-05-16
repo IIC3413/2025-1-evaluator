@@ -4,11 +4,17 @@ io/tests/*
 io/results/*
 io/submissions/*
 io/data/*
+io/corrections/*
 # Do keep the folders.
 !io/rests/.keep
 !io/results/.keep
 !io/submissions/.keep
 !io/data/.keep
+!io/corrections/.keep
 # Add lab 1 baseline info.
 !io/tests/l1
 !io/data/l1
+# Add lab 2 baseline info.
+!io/tests/l2
+!io/data/l2
+!io/corrections/l2

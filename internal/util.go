@@ -16,7 +16,9 @@ import (
 
 const copyLimit = 2 << 24
 
-func copyZipFile(fd *zip.File, target string) (err error) {
+var ErrNoRoot = errors.New("zip file has not root")
+
+func copyZipFile(fd *zip.File, root, target string) (err error) {
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("failed to copy zip file: %w", err)
@@ -29,7 +31,7 @@ func copyZipFile(fd *zip.File, target string) (err error) {
 		return nil
 	}
 
-	fp := strings.Split(sourcefy(fd.Name), string(os.PathSeparator))
+	fp := strings.Split(sourcefy(fd.Name, root), string(os.PathSeparator))
 	// Early exit if source dir.
 	if len(fp) == 0 || len(fp) == 1 {
 		return nil
@@ -64,6 +66,20 @@ func copyZipFile(fd *zip.File, target string) (err error) {
 		}
 	}
 	return nil
+}
+
+func determineZipRoot(zr *zip.ReadCloser) (string, error) {
+	root := strings.SplitN(zr.File[0].Name, string(os.PathSeparator), 2)[0]
+	for _, fe := range zr.File {
+		split := strings.SplitN(fe.Name, string(os.PathSeparator), 2)
+		if len(split) == 1 {
+			root = split[0]
+		}
+		if root != split[0] {
+			return "", ErrNoRoot
+		}
+	}
+	return root, nil
 }
 
 func runCommand(cmd *exec.Cmd) (string, error) {
@@ -153,8 +169,11 @@ func compReaders(r1, r2 io.Reader) (bool, error) {
 	return rb1 == rb2 && bytes.Equal(buf1[:rb1], buf2[:rb2]), nil
 }
 
-func sourcefy(path string) string {
+func sourcefy(path, root string) string {
 	if !strings.Contains(path, "src") {
+		if root == "" {
+			return filepath.Join("src", path)
+		}
 		split := strings.SplitN(path, string(os.PathSeparator), 2)
 		if len(split) == 1 {
 			return filepath.Join("src", split[0])

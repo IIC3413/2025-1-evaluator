@@ -84,6 +84,9 @@ func (e *Evaluator) evalSubmission(idx int) (err error) {
 	if err = e.insertDeps(); err != nil {
 		return err
 	}
+	if err = e.ctx.Corrections.Apply(); err != nil {
+		return err
+	}
 	if err = e.compileTests(); err != nil {
 		// A compilation error means no points can be awarded.
 		e.logger.Printf(
@@ -119,8 +122,13 @@ func (e *Evaluator) unzipSubmission(idx int) (err error) {
 		return err
 	}
 
+	root, err := determineZipRoot(zr)
+	if err != nil {
+		root = ""
+	}
+
 	for _, fd := range zr.File {
-		if err = copyZipFile(fd, target); err != nil {
+		if err = copyZipFile(fd, root, target); err != nil {
 			return err
 		}
 	}

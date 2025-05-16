@@ -2,7 +2,10 @@ module evaluator
 
 go 1.24.1
 
-require github.com/schollz/progressbar/v3 v3.18.0
+require (
+	github.com/schollz/progressbar/v3 v3.18.0
+	gopkg.in/yaml.v3 v3.0.1
+)
 
 require (
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
