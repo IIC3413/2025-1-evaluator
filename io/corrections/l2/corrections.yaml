@@ -1,0 +1,3 @@
+entries:
+  - file_name: "catalog.cc"
+    target_path: "src/system/catalog.cc"
