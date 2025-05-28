@@ -1,6 +1,8 @@
 io/tests/*
 io/results/*
 io/submissions/*
+io/corrections/*
 !io/rests/.keep
 !io/results/.keep
 !io/submissions/.keep
+!io/corrections/.keep
