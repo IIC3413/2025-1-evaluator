@@ -41,8 +41,8 @@ io
             |             catalog.dat
             |             table
             + --- outputs
-                    test_1_output
-                    test_2_output
+                    test_1.output
+                    test_2.output
 ```
 
 A successful test, should write its output to an `outputs` directory inside the
@@ -50,7 +50,7 @@ path where it's executable is called following the naming scheem of the files
 in `io/data/{lab_n}/outputs`. If a test encounters an error it may not write an
 output only if it exists with a none 0 code. In this case the evaluation
 program will write a predetermined output under the name
-`{test_file_name}_output`, ensuring that this will be evaluated as wrong.
+`{test_file_name}.output`, ensuring that this will be evaluated as wrong.
 
 To run the tests use the following command:
 

@@ -382,7 +382,7 @@ func writeErrorOutput(t string) (err error) {
 		}
 	}()
 
-	f, err := os.Create(filepath.Join(workingDir, outputsDir, t+"_output"))
+	f, err := os.Create(filepath.Join(workingDir, outputsDir, t+".output"))
 	if err != nil {
 		return err
 	}
