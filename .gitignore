@@ -21,3 +21,7 @@ io/corrections/*
 #Add lab 3 baseline info.
 !io/tests/l3
 !io/data/l3
+#Add lab 4 baseline info.
+!io/tests/l4
+!io/data/l4
+!io/corrections/l4
